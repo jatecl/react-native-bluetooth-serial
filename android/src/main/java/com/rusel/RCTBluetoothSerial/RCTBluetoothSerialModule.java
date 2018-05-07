@@ -14,6 +14,7 @@ import android.content.IntentFilter;
 import android.os.Build;
 import android.util.Log;
 import android.util.Base64;
+import android.provider.Settings;
 
 import com.facebook.react.bridge.ActivityEventListener;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -51,14 +52,11 @@ public class RCTBluetoothSerialModule extends ReactContextBaseJavaModule impleme
     private RCTBluetoothSerialService mBluetoothService;
     private ReactApplicationContext mReactContext;
 
-    private StringBuffer mBuffer = new StringBuffer();
-
     // Promises
     private Promise mEnabledPromise;
     private Promise mConnectedPromise;
     private Promise mDeviceDiscoveryPromise;
     private Promise mPairDevicePromise;
-    private String delimiter = "";
 
     public RCTBluetoothSerialModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -213,12 +211,6 @@ public class RCTBluetoothSerialModule extends ReactContextBaseJavaModule impleme
         }
     }
 
-    @ReactMethod
-    public void withDelimiter(String delimiter, Promise promise) {
-        this.delimiter = delimiter;
-        promise.resolve(true);
-    }
-
     /**************************************/
     /** Bluetooth device related methods **/
 
@@ -366,47 +358,6 @@ public class RCTBluetoothSerialModule extends ReactContextBaseJavaModule impleme
         promise.resolve(true);
     }
 
-    /**********************/
-    /** Read from device **/
-
-    @ReactMethod
-    /**
-     * Read from device over serial port
-     */
-    public void readFromDevice(Promise promise) {
-        if (D) Log.d(TAG, "Read");
-        int length = mBuffer.length();
-        String data = mBuffer.substring(0, length);
-        mBuffer.delete(0, length);
-        promise.resolve(data);
-    }
-
-    @ReactMethod
-    public void readUntilDelimiter(String delimiter, Promise promise) {
-        promise.resolve(readUntil(delimiter));
-    }
-
-
-    /***********/
-    /** Other **/
-
-    @ReactMethod
-    /**
-     * Clear data in buffer
-     */
-    public void clear(Promise promise) {
-        mBuffer.setLength(0);
-        promise.resolve(true);
-    }
-
-    @ReactMethod
-    /**
-     * Get length of data available to read
-     */
-    public void available(Promise promise) {
-        promise.resolve(mBuffer.length());
-    }
-
 
     @ReactMethod
     /**
@@ -416,6 +367,13 @@ public class RCTBluetoothSerialModule extends ReactContextBaseJavaModule impleme
         if (mBluetoothAdapter != null) {
             mBluetoothAdapter.setName(newName);
         }
+        promise.resolve(true);
+    }
+
+    @ReactMethod
+    public void showSettings(Promise promise) {
+        Intent intent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+        getCurrentActivity().startActivity(intent);
         promise.resolve(true);
     }
 
@@ -476,23 +434,9 @@ public class RCTBluetoothSerialModule extends ReactContextBaseJavaModule impleme
      * @param data Message
      */
     void onData (String data) {
-        mBuffer.append(data);
-        String completeData = readUntil(this.delimiter);
-        if (completeData != null && completeData.length() > 0) {
-            WritableMap params = Arguments.createMap();
-            params.putString("data", completeData);
-            sendEvent(DEVICE_READ, params);
-        }
-    }
-
-    private String readUntil(String delimiter) {
-        String data = "";
-        int index = mBuffer.indexOf(delimiter, 0);
-        if (index > -1) {
-            data = mBuffer.substring(0, index + delimiter.length());
-            mBuffer.delete(0, index + delimiter.length());
-        }
-        return data;
+        WritableMap params = Arguments.createMap();
+        params.putString("data", data);
+        sendEvent(DEVICE_READ, params);
     }
 
     /*********************/

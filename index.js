@@ -27,11 +27,21 @@ BluetoothSerial.removeListener = (eventName, handler) => {
  * @param  {Buffer|String} data
  * @return {Promise<Boolean>}
  */
-BluetoothSerial.write = (data) => {
+BluetoothSerial.writeBuffer = (data) => {
   if (typeof data === 'string') {
     data = new Buffer(data)
   }
   return BluetoothSerial.writeToDevice(data.toString('base64'))
 }
 
-module.exports = BluetoothSerial
+/**
+ * Write data to device, you can pass string like this:
+ * "\xeb\x90\x05\x00\x00\x04\x09"
+ * @param  {String} data
+ * @return {Promise<Boolean>}
+ */
+BluetoothSerial.write = (data) => {
+  return BluetoothSerial.writeToDevice(btoa(data));
+}
+
+module.exports = BluetoothSerial;

@@ -43,7 +43,7 @@ Officialy this library supports React Native >= 0.25, it may run on older versio
 ## Example
 As bluetooth is not available in any simulators, if you want to test it with some bluetooth peripherals you have
 to run the example on actual device.
-1. `git clone https://github.com/rusel1989/react-native-bluetooth-serial.git`
+1. `git clone https://github.com/jatecl/react-native-bluetooth-serial.git`
 2. `cd react-native-bluetooth-serial/BluetoothSerialExample`
 3. `npm i`
 4. `react-native run-ios/run-android`
@@ -90,11 +90,14 @@ Disconnects from current device should always resolve to true.
 ### isConnected()
 Resolves to true if there is active connection to device or false if not.
 
-### write(Buffer|String data)
-Write data to connected device, for now buffer is internally converted to Base64 encoded string and decoded to byte array
-on native side, beacause react native is currently not capable of passing buffer directly to native methods. Resolves
-to true when write was successful, otherwise rejects with error.
+### write(String data)
+ Write data to device, you can pass string like this:
+ ```
+ BluetoothSerial.write("\xeb\x90\x05\x00\x00\x04\x09");
+ ```
 
+### [android] showSettings()
+Show system bluetooth settings.
 
 ## Events
 You can listen to few event with `BluetoothSerial.on(eventName, callback)`
@@ -104,6 +107,7 @@ Currently provided events are:
 - `bluetoothDisabled` - when user disabled bt
 - `connectionSuccess` - when app connected to device
 - `connectionLost` - when app lost connection to device (fired with `bluetoothDisabled`)
+- `read` - when data readed
 
 You can use `BluetoothSerial.removeListener(eventName, callback)` to stop listening to an event
 

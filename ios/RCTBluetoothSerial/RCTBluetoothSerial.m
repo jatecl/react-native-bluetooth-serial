@@ -9,9 +9,7 @@
 #import "RCTBluetoothSerial.h"
 
 @interface RCTBluetoothSerial()
-- (NSString *)readUntilDelimiter:(NSString *)delimiter;
 - (NSMutableArray *)getPeripheralList;
-- (void)sendDataToSubscriber;
 - (CBPeripheral *)findPeripheralByUUID:(NSString *)uuid;
 - (void)connectToUUID:(NSString *)uuid;
 - (void)listPeripheralsTimer:(NSTimer *)timer;
@@ -30,7 +28,6 @@ RCT_EXPORT_MODULE();
     [_bleShield controlSetup];
     [_bleShield setDelegate:self];
 
-    _buffer = [[NSMutableString alloc] init];
     return self;
 }
 
@@ -90,33 +87,6 @@ RCT_EXPORT_METHOD(disconnect:(RCTPromiseResolveBlock)resolve
     resolve((id)kCFBooleanTrue);
 }
 
-RCT_EXPORT_METHOD(subscribe:(NSString *)delimiter
-                  resolver:(RCTPromiseResolveBlock)resolve
-                  rejector:(RCTPromiseRejectBlock)reject)
-{
-    NSLog(@"subscribe");
-
-    if (delimiter != nil) {
-        _delimiter = [delimiter copy];
-        _subscribed = TRUE;
-        resolve((id)kCFBooleanTrue);
-    } else {
-        NSError *err = nil;
-        reject(@"no_delimiter", @"Delimiter was null", err);
-    }
-}
-
-RCT_EXPORT_METHOD(unsubscribe:(NSString *)delimiter
-                  resolver:(RCTPromiseResolveBlock)resolve)
-{
-    NSLog(@"unsubscribe");
-
-    _delimiter = nil;
-    _subscribed = FALSE;
-
-    resolve((id)kCFBooleanTrue);
-}
-
 RCT_EXPORT_METHOD(writeToDevice:(NSString *)message
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejector:(RCTPromiseRejectBlock)reject)
@@ -165,45 +135,6 @@ RCT_EXPORT_METHOD(isConnected:(RCTPromiseResolveBlock)resolve
     }
 }
 
-RCT_EXPORT_METHOD(available:(RCTPromiseResolveBlock)resolve
-                  rejector:(RCTPromiseRejectBlock)reject)
-{
-    // future versions could use messageAsNSInteger, but realistically, int is fine for buffer length
-    NSNumber *buffLen = [NSNumber numberWithInteger:[_buffer length]];
-    resolve(buffLen);
-}
-
-RCT_EXPORT_METHOD(read:(RCTPromiseResolveBlock)resolve
-                  rejector:(RCTPromiseRejectBlock)reject)
-{
-    NSString *message = @"";
-
-    if ([_buffer length] > 0) {
-        long end = [_buffer length] - 1;
-        message = [_buffer substringToIndex:end];
-        NSRange entireString = NSMakeRange(0, end);
-        [_buffer deleteCharactersInRange:entireString];
-    }
-
-    resolve(message);
-}
-
-RCT_EXPORT_METHOD(readUntil:(NSString *)delimiter
-                  resolver:(RCTPromiseResolveBlock)resolve
-                  rejector:(RCTPromiseRejectBlock)reject)
-{
-    NSString *message = [self readUntilDelimiter:delimiter];
-    resolve(message);
-}
-
-RCT_EXPORT_METHOD(clear:(RCTPromiseResolveBlock)resolve)
-{
-    long end = [_buffer length] - 1;
-    NSRange truncate = NSMakeRange(0, end);
-    [_buffer deleteCharactersInRange:truncate];
-    resolve((id)kCFBooleanTrue);
-}
-
 #pragma mark - BLEDelegate
 
 - (void)bleDidReceiveData:(unsigned char *)data length:(int)length
@@ -213,24 +144,7 @@ RCT_EXPORT_METHOD(clear:(RCTPromiseResolveBlock)resolve)
     // Append to the buffer
     NSData *d = [NSData dataWithBytes:data length:length];
     NSString *s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
-    NSLog(@"Received %@", s);
-
-    if (s) {
-        [_buffer appendString:s];
-
-        if (_subscribed) {
-            [self sendDataToSubscriber]; // only sends if a delimiter is hit
-        }
-
-    } else {
-        NSLog(@"Error converting received data into a String.");
-    }
-
-    // Always send raw data if someone is listening
-    //if (_subscribeBytesCallbackId) {
-    //    NSData* nsData = [NSData dataWithBytes:(const void *)data length:length];
-    //}
-
+    [self.bridge.eventDispatcher sendDeviceEventWithName:@"read" body:@{@"data": s}];
 }
 
 - (void)bleDidChangedState:(bool)isEnabled
@@ -320,23 +234,6 @@ RCT_EXPORT_METHOD(clear:(RCTPromiseResolveBlock)resolve)
 
 #pragma mark - internal implemetation
 
-- (NSString*)readUntilDelimiter: (NSString*) delimiter
-{
-
-    NSRange range = [_buffer rangeOfString: delimiter];
-    NSString *message = @"";
-
-    if (range.location != NSNotFound) {
-
-        long end = range.location + range.length;
-        message = [_buffer substringToIndex:end];
-
-        NSRange truncate = NSMakeRange(0, end);
-        [_buffer deleteCharactersInRange:truncate];
-    }
-    return message;
-}
-
 - (NSMutableArray*) getPeripheralList
 {
 
@@ -365,17 +262,6 @@ RCT_EXPORT_METHOD(clear:(RCTPromiseResolveBlock)resolve)
     }
 
     return peripherals;
-}
-
-// calls the JavaScript subscriber with data if we hit the _delimiter
-- (void) sendDataToSubscriber {
-
-    NSString *message = [self readUntilDelimiter:_delimiter];
-
-    if ([message length] > 0) {
-      [self.bridge.eventDispatcher sendDeviceEventWithName:@"data" body:@{@"data": message}];
-    }
-
 }
 
 // Ideally we'd get a callback when found, maybe _bleShield can be modified
